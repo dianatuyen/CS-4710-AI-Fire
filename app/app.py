@@ -13,7 +13,7 @@ with open("style.css") as f:
 # Set title of the app
 st.title("CS4710: Wildfire Detection AI")
 
-# Initialize session state variables if they don't exist
+# Initialize or reset the session state variables
 if 'images' not in st.session_state:
     st.session_state['images'] = []
 if 'upload_again' not in st.session_state:
@@ -24,10 +24,11 @@ model = load_trained_model("temp_model.h5")
 
 # Display previous images and their results
 for img_data in st.session_state['images']:
-    st.image(img_data['image'], caption="Processed Image", use_column_width=True)
+    st.image(img_data['image'], caption=f"Processed Image ({img_data['filename']})", use_column_width=True)
     st.write(f"Total burnt area: {img_data['area']} km²")
     st.write(f"Total CO2 emitted: {img_data['co2']} tons")
     st.write(f"Equivalent days of emissions: {img_data['days']} days")
+    st.write("")  # Add a gap
 
 # Show uploader based on session state
 if st.session_state['upload_again']:
@@ -37,11 +38,13 @@ if st.session_state['upload_again']:
     if uploaded_file or image_url:
         if uploaded_file:
             uploaded_image = Image.open(uploaded_file)
+            image_name = uploaded_file.name
         else:
             try:
                 response = requests.get(image_url)
                 if response.status_code == 200:
                     uploaded_image = Image.open(BytesIO(response.content))
+                    image_name = image_url.split("/")[-1]
                 else:
                     st.error("Failed to download the image. Please check the URL and try again.")
                     st.stop()
@@ -49,8 +52,10 @@ if st.session_state['upload_again']:
                 st.error(f"Error downloading the image: {e}")
                 st.stop()
 
-        st.image(uploaded_image, caption="Original Raw Image", use_column_width=True)
+        st.image(uploaded_image, caption=f"Original Raw Image ({image_name})", use_column_width=True)
+        st.write("")  # Add a gap after the image
 
+        # Image processing and prediction
         with st.spinner("Pre-processing the image..."):
             input_image_array = np.array(uploaded_image)
             original_width, original_height, _ = input_image_array.shape
@@ -67,12 +72,12 @@ if st.session_state['upload_again']:
         preds_t = (preds > 0.25).astype(np.uint8)
         output_mask = conv_float_int(combine_image(preds_t, row_num, col_num, original_width, original_height, remove_ghost=False)[:, :, 0])
 
-        forest_type = st.selectbox("Please select the type of forest:", ['Tropical Forest', 'Temperate Forest', 'Boreal Forest', 'Shrublands', 'Grasslands'], key="forest_type")
-        resolution = st.slider("Please enter the image resolution value:", min_value=1, max_value=20, value=10, step=1, key="resolution")
+        forest_type = st.selectbox("Please select the type of forest:", ['Tropical Forest', 'Temperate Forest', 'Boreal Forest', 'Shrublands', 'Grasslands'])
+        resolution = st.slider("Please enter the image resolution value:", min_value=1, max_value=20, value=10, step=1)
 
         try:
             area, biomass_burnt, equal_days = burn_area(output_mask=output_mask, resolution=resolution, forest_type=forest_type)
-            result = {'image': uploaded_image, 'area': f"{area / 1e6:.2f} km²", 'co2': f"{biomass_burnt / 1e6:.2f} tons", 'days': f"{equal_days:.2f} days"}
+            result = {'image': uploaded_image, 'filename': image_name, 'area': f"{area / 1e6:.2f} km²", 'co2': f"{biomass_burnt / 1e6:.2f} tons", 'days': f"{equal_days:.2f} days"}
             st.session_state['images'].append(result)
             st.metric("Total burnt area", f"{result['area']} km²")
             st.metric("Total CO2 emitted", f"{result['co2']} tons")
@@ -81,15 +86,15 @@ if st.session_state['upload_again']:
         except ValueError:
             st.error("Please enter a valid number for the image resolution.")
 
-
+# Query to continue
 st.write('Would you like to add more images?')
 
 col1, col2 = st.columns(2)
 with col1:
     if st.button('Yes'):
-        reset_state()
-        st.experimental_rerun()
+        st.session_state.upload_again = True  # This ensures the uploader is shown again
+        st.experimental_rerun()  # This forces the app to rerun from the top
 with col2:
     if st.button('No'):
         st.success('Thank you for using our Wildfire Detection AI!')
-        st.session_state.upload_again = False  # Set this to control other parts of the app if needed
+        st.session_state.upload_again = False  # This will hide the uploader and prevent further interactions

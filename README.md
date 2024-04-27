@@ -31,4 +31,5 @@ source venv/bin/activate
 virtualenv venv
 
 * Launch
+
 streamlit run app.py

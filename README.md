@@ -5,10 +5,15 @@ Google Collab Link: https://colab.research.google.com/drive/1hntLRrseHF1yuS2iKUr
 Required packages (MacOS):
 
 pip install tensorflow
+
 pip install matplotlib
+
 pip install streamlit
+
 pip install numpy
+
 pip install Keras
+
 pip install Pillow
 
 
